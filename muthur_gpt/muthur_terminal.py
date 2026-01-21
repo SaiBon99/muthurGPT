@@ -1,7 +1,9 @@
 import os
 import random
+import shutil
 import subprocess
 import re
+import sys
 import time
 from termcolor import colored
 
@@ -130,7 +132,7 @@ class MuthurTerminal():
         filename = os.path.join(tempfile.gettempdir(), 'voice.mp3')
         tts = gTTS(text)
         tts.save(filename)
-        subprocess.Popen(["afplay", filename])
+        self._play_audio_file(filename)
 
     def print_slow_lines(self, text, speed=None, sound=True):
         if not speed:
@@ -173,7 +175,30 @@ class MuthurTerminal():
             sound_path = self.path_resolver.get_sound_path(sound_name)
             if not sound_path:
                 raise Exception(f"Sound file unresolved for {sound_name}")
-            return subprocess.Popen(["afplay", sound_path])
+            return self._play_audio_file(sound_path)
+
+    def _play_audio_file(self, sound_path):
+        """Play an audio file using platform-appropriate player."""
+        if sys.platform == "darwin":
+            # macOS
+            return subprocess.Popen(["afplay", sound_path],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif sys.platform.startswith("linux"):
+            # Linux - try common audio players in order of preference
+            for player_cmd in [
+                ["paplay", sound_path],          # PulseAudio
+                ["aplay", sound_path],           # ALSA
+                ["mpv", "--no-video", sound_path],  # mpv
+                ["ffplay", "-nodisp", "-autoexit", sound_path],  # ffmpeg
+            ]:
+                if shutil.which(player_cmd[0]):
+                    return subprocess.Popen(player_cmd,
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            # No player found - fail silently
+            return None
+        else:
+            # Windows or other - fail silently
+            return None
 
     def display_image(self, image_name):
         """

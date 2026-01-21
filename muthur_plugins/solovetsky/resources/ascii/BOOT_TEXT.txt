@@ -1,0 +1,26 @@
+
+═══════════════════════════════════════════════════════════════════════
+                    DA/UT/UR 2200 MAINFRAME SYSTEM
+                    WEYLAND-YUTANI CORP. FIRMWARE v7.2.1
+═══════════════════════════════════════════════════════════════════════
+
+VESSEL: UNCSS SOLOVETSKY ISLAND
+CLASS: MAGELLAN-CLASS J SCIENCE EXPLORATION VESSEL
+REGISTRY: GMM-SEV-002
+MISSION: GREAT MOTHER MISSION - FAR SPINWARD COLONIES EXPEDITION
+
+SYSTEM INITIALIZATION...
+> CORE SYSTEMS...................... [OK]
+> NAVIGATION ARRAY.................. [OK]
+> LIFE SUPPORT...................... [OK]
+> SENSOR GRID....................... [OK]
+> COMMUNICATION SYSTEMS............. [OK]
+> FTL DRIVE......................... [STANDBY]
+> WEAPONS SYSTEMS................... [DEFENSIVE ONLY]
+> CARGO MANAGEMENT.................. [OK]
+> VEHICLE BAY....................... [OK]
+> CRYOGENIC SYSTEMS................. [OK]
+> MEDPOD ARRAY...................... [OK]
+
+FTL NETWORK STATUS: LINKED TO MU/TH/UR 9000 @ UNCSS IYANLÁ
+
