@@ -1,3 +1,6 @@
+import os
+import re
+
 from muthur_gpt.plugin_base import register_plugin
 from muthur_gpt.plugin_base import Plugin
 
@@ -20,13 +23,172 @@ class SolovetskyPlugin(Plugin):
         with open(self.path_resolver.get_ascii_path("BOOT_TEXT"), "r") as f:
             self.boot_text = f.read()
 
+        # Load ship logs database
+        self.ship_logs = self._load_ship_logs()
+
+    def _load_ship_logs(self):
+        """Load and parse ship logs from data file."""
+        logs_path = os.path.join(
+            os.path.dirname(__file__), "resources", "data", "ship_logs.txt")
+        if not os.path.exists(logs_path):
+            return {}
+
+        with open(logs_path, "r") as f:
+            content = f.read()
+
+        # Parse logs into categories
+        logs = {
+            "CRYO": [],
+            "MAINT": [],
+            "ENV": [],
+            "SEC": [],
+            "MED": [],
+            "NAV": [],
+            "COMM": [],
+            "PERSONNEL": "",
+            "INCIDENT": ""
+        }
+
+        # Extract each section
+        sections = {
+            "CRYO": r"CRYOSLEEP LOGS \(CRYO\)\n={80}\n\n(.*?)(?=\n={80})",
+            "MAINT": r"MAINTENANCE LOGS \(MAINT\)\n={80}\n\n(.*?)(?=\n={80})",
+            "ENV": r"ENVIRONMENTAL LOGS \(ENV\)\n={80}\n\n(.*?)(?=\n={80})",
+            "SEC": r"SECURITY LOGS \(SEC\)\n={80}\n\n(.*?)(?=\n={80})",
+            "MED": r"MEDICAL LOGS \(MED\)\n={80}\n\n(.*?)(?=\n={80})",
+            "COMM": r"COMMUNICATIONS LOGS \(COMM\)\n={80}\n\n(.*?)(?=\n={80})",
+            "NAV": r"NAVIGATION LOGS \(NAV\)\n={80}\n\n(.*?)(?=\n={80})",
+            "PERSONNEL": r"PERSONNEL FILE ADDENDUM\n={80}\n\n(.*?)(?=\n={80})",
+            "INCIDENT": r"INCIDENT SUMMARY REPORT\n={80}\n\n(.*?)(?=\n={80})"
+        }
+
+        for category, pattern in sections.items():
+            match = re.search(pattern, content, re.DOTALL)
+            if match:
+                section_content = match.group(1).strip()
+                if category in ["PERSONNEL", "INCIDENT"]:
+                    logs[category] = section_content
+                else:
+                    # Split into individual log entries
+                    entries = re.split(r'\n\n(?=[A-Z]+-\d{3})', section_content)
+                    logs[category] = [e.strip() for e in entries if e.strip()]
+
+        return logs
+
     def filter_bot_reply(self, bot_reply):
-        """Process bot replies for special triggers."""
+        """Process bot replies for special triggers and log tags."""
+        # Handle sound triggers
         if "PRIORITY ALERT" in bot_reply.upper():
             self.react_priority_alert()
         if "DISTRESS SIGNAL" in bot_reply.upper():
             self.react_distress_signal()
+
+        # Handle log tags: <LOG:CATEGORY>, <LOG:CATEGORY:NUMBER>, <LOG:INDEX>
+        bot_reply = self._process_log_tags(bot_reply)
+
         return bot_reply
+
+    def _process_log_tags(self, text):
+        """Replace <LOG:...> tags with actual log content."""
+        # Pattern matches <LOG:CATEGORY> or <LOG:CATEGORY:NUMBER>
+        log_pattern = r'<LOG:([A-Z]+)(?::(\d+))?>'
+
+        def replace_log_tag(match):
+            category = match.group(1).upper()
+            entry_num = int(match.group(2)) if match.group(2) else None
+
+            if category == "INDEX":
+                return self._get_log_index()
+            elif category == "KOBLENZ":
+                return self._get_crew_logs("KOBLENZ")
+            elif category == "OKONKWO":
+                return self._get_crew_logs("OKONKWO")
+            elif category == "PERSONNEL":
+                return self._get_personnel_file()
+            elif category == "INCIDENT" or category == "SUMMARY":
+                return self._get_incident_summary()
+            else:
+                return self._get_log_content(category, entry_num)
+
+        return re.sub(log_pattern, replace_log_tag, text)
+
+    def _get_log_index(self):
+        """Return the log category index."""
+        return ("SHIP LOG DATABASE - UNCSS SOLOVETSKY ISLAND\n"
+                "═══════════════════════════════════════════════════════\n\n"
+                "LOG CATEGORIES AVAILABLE:\n\n"
+                "CRYO    - Cryosleep chamber monitoring logs (27 entries)\n"
+                "MAINT   - Maintenance access and repair logs (8 entries)\n"
+                "ENV     - Environmental and life support logs (5 entries)\n"
+                "SEC     - Security sensor and access logs (8 entries)\n"
+                "MED     - Medical bay and MedPod logs (4 entries)\n"
+                "NAV     - Navigation and course logs (4 entries)\n"
+                "COMM    - Communications logs (7 entries)\n\n"
+                "PERSONNEL - Crew file addendums\n"
+                "INCIDENT  - Transit incident summary report\n")
+
+    def _get_log_content(self, category, entry_num=None):
+        """Get log content for a category, optionally filtered by entry number."""
+        category_logs = self.ship_logs.get(category, [])
+        if not category_logs:
+            return f"NO RECORDS FOUND FOR CATEGORY: {category}"
+
+        category_names = {
+            "CRYO": "CRYOSLEEP",
+            "MAINT": "MAINTENANCE",
+            "ENV": "ENVIRONMENTAL",
+            "SEC": "SECURITY",
+            "MED": "MEDICAL",
+            "NAV": "NAVIGATION",
+            "COMM": "COMMUNICATIONS"
+        }
+
+        if entry_num is not None:
+            # Find specific entry
+            for log in category_logs:
+                if f"{category}-{entry_num:03d}" in log or f"{category}-{entry_num}" in log:
+                    return (f"LOG ENTRY: {category}-{entry_num:03d}\n"
+                            "═══════════════════════════════════════════════════════\n\n"
+                            + log)
+            return f"LOG ENTRY {category}-{entry_num:03d} NOT FOUND"
+
+        # Return all entries
+        header = f"{category_names.get(category, category)} LOGS ({category})"
+        separator = "═" * 55
+        result = f"{header}\n{separator}\n\n"
+        result += "\n\n".join(category_logs)
+        return result
+
+    def _get_crew_logs(self, crew_name):
+        """Return all log entries mentioning a specific crew member."""
+        result = (f"LOG ENTRIES REFERENCING: {crew_name}\n"
+                  "═══════════════════════════════════════════════════════\n\n")
+
+        relevant_logs = []
+        for category, logs in self.ship_logs.items():
+            if category in ["PERSONNEL", "INCIDENT"]:
+                continue
+            if isinstance(logs, list):
+                for log in logs:
+                    if crew_name.upper() in log.upper():
+                        relevant_logs.append(log)
+
+        if relevant_logs:
+            result += "\n\n".join(relevant_logs)
+        else:
+            result += "No log entries found."
+
+        return result
+
+    def _get_personnel_file(self):
+        """Return the personnel file addendum."""
+        return ("PERSONNEL FILE ADDENDUM\n"
+                "═══════════════════════════════════════════════════════\n\n"
+                + self.ship_logs.get("PERSONNEL", "No personnel records found."))
+
+    def _get_incident_summary(self):
+        """Return the incident summary report."""
+        return self.ship_logs.get("INCIDENT", "No incident report found.")
 
     def filter_plugin_prompt(self, prompt):
         """Add dynamic context based on game state."""

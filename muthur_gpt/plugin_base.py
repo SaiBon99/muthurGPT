@@ -88,6 +88,17 @@ class Plugin():
         """
         return ""
 
+    def get_static_reply(self, user_input):
+        """
+        Can be optionally implemented to return static responses for certain queries
+        without requiring LLM processing. This is useful for pre-written content like
+        ship logs, database entries, or other fixed data that players should be able
+        to query directly.
+
+        Return an empty string to pass the query to the LLM instead.
+        """
+        return ""
+
     @staticmethod
     def create_plugin(name, config, terminal, path_resolver):
         if name not in all_plugins:

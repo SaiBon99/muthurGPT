@@ -44,7 +44,10 @@ class MuthurController():
                     if user_input:
                         # Filter input before sending to bot [plugin only, optional]
                         user_input = self.plugin.filter_user_input(user_input)
-                        bot_reply = self.bot.get_reply(user_input)
+                        # Check for static reply first (bypasses LLM)
+                        bot_reply = self.plugin.get_static_reply(user_input)
+                        if not bot_reply:
+                            bot_reply = self.bot.get_reply(user_input)
                     else:
                         # This is either the first message or there is no user input.
                         bot_reply = self.config.get(constants.CONFIG_KEY_GENERIC_BOT_MESSAGE)
